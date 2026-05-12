@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>백암초 씨름부 훈련일지</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .layout {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 280px;
+            gap: 20px;
+        }
+        @media (max-width: 900px) {
+            .layout { grid-template-columns: 1fr; }
+        }
+        .container {
+            background: white;
+            padding: 30px 40px;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+        }
+        .sidebar {
+            background: white;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 26px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .section {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .section-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+        .row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .row > div {
+            flex: 1;
+            min-width: 150px;
+        }
+        label {
+            display: block;
+            font-size: 13px;
+            color: #555;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+        input[type="text"], input[type="number"], textarea, select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1.5px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color 0.2s;
+            background: white;
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        .ai-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .ai-row input {
+            flex: 1;
+        }
+        .quick-select {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        .quick-select label {
+            margin: 0;
+            font-size: 13px;
+            color: #666;
+            white-space: nowrap;
+        }
+        .quick-select select {
+            flex: 1;
+            max-width: 250px;
+        }
+        .btn {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .btn-ai {
+            background: #667eea;
+            color: white;
+            white-space: nowrap;
+        }
+        .btn-ai:hover { background: #5568d3; }
+        .btn-ai:disabled { background: #aaa; cursor: not-allowed; }
+        .btn-save {
+            background: #3498db;
+            color: white;
+            width: 100%;
+            padding: 14px;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        .btn-save:hover { background: #2980b9; }
+        .btn-new {
+            background: #95a5a6;
+            color: white;
+            width: 100%;
+            padding: 10px;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+        .btn-new:hover { background: #7f8c8d; }
+        .btn-cumulative {
+            background: #e67e22;
+            color: white;
+            width: 100%;
+            padding: 12px;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+        .btn-cumulative:hover { background: #d35400; }
+        .loading {
+            display: none;
+            color: #667eea;
+            font-size: 13px;
+            margin-top: 6px;
+        }
+        /* 알림 토스트 */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #27ae60;
+            color: white;
+            padding: 14px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .toast.show { opacity: 1; }
+        .toast.error { background: #c0392b; }
+        /* 편집 모드 표시 */
+        .edit-mode-banner {
+            display: none;
+            background: #f39c12;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            text-align: center;
+        }
+        .edit-mode-banner.show { display: block; }
+        /* 사이드바 */
+        .sidebar h3 {
+            margin: 0 0 12px 0;
+            color: #2c3e50;
+            font-size: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .sidebar .count {
+            background: #667eea;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+        .records-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+        .record-item {
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            transition: all 0.2s;
+            background: white;
+            font-size: 13px;
+            cursor: grab;
+        }
+        .record-item:active { cursor: grabbing; }
+        .record-item.dragging {
+            opacity: 0.4;
+            background: #e8e8e8;
+        }
+        .record-item.drag-over {
+            border-top: 3px solid #667eea;
+        }
+        .record-item:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+        .record-date {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 2px;
+        }
+        .record-place {
+            font-size: 11px;
+            color: #888;
+        }
+        .record-actions {
+            display: flex;
+            gap: 4px;
+            margin-top: 6px;
+            flex-wrap: wrap;
+        }
+        .record-actions button {
+            flex: 1;
+            min-width: 50px;
+            padding: 4px 6px;
+            font-size: 11px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .record-actions button:hover { background: #f0f0f0; }
+        .record-actions .btn-delete { color: #c0392b; }
+        .record-actions .btn-dl { color: #27ae60; }
+        .empty-records {
+            padding: 20px;
+            text-align: center;
+            color: #aaa;
+            font-size: 13px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .data-info {
+            margin-top: 16px;
+            padding: 12px;
+            background: #fef9e7;
+            border-radius: 6px;
+            font-size: 11px;
+            color: #7d6608;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <!-- 메인 컨테이너 -->
+        <div class="container">
+            <h1>🤼 씨름부 훈련일지 자동 작성</h1>
+            <p class="subtitle">백암초등학교 · 연구학교 업무경감 프로그램</p>
+
+            <!-- 편집 모드 배너 -->
+            <div class="edit-mode-banner" id="edit_banner">
+                ✏️ <strong>편집 모드</strong> - 기존 일지를 수정 중입니다. 저장하면 덮어써집니다.
+                <button onclick="clearForm()" style="margin-left:10px; padding:4px 10px; border:none; border-radius:4px; background:white; color:#f39c12; cursor:pointer; font-weight:600;">새 일지 작성</button>
+            </div>
+
+            <!-- 기본 정보 -->
+            <div class="section">
+                <div class="section-title">📌 기본 정보</div>
+                <div class="row">
+                    <div style="flex: 2;">
+                        <label>일시 <span style="color:#888; font-weight:normal;">(기본값: 오늘 / 클릭하여 달력에서 선택 가능)</span></label>
+                        <input type="date" id="date_picker" onchange="updateDateFromPicker()">
+                        <input type="hidden" id="date">
+                        <div id="date_display" style="margin-top:4px; font-size:13px; color:#555; padding: 6px 10px; background: #f0f3ff; border-radius: 4px;"></div>
+                    </div>
+                    <div style="flex: 2;">
+                        <label>훈련장소</label>
+                        <input type="text" id="place" value="본교 씨름장">
+                    </div>
+                </div>
+                <div class="row">
+                    <div>
+                        <label>총인원</label>
+                        <input type="number" id="total" min="0" placeholder="예: 12" oninput="autoCalcAbsent()">
+                    </div>
+                    <div>
+                        <label>훈련참가인원</label>
+                        <input type="number" id="attend" min="0" placeholder="예: 10" oninput="autoCalcAbsent()">
+                    </div>
+                    <div>
+                        <label>불참인원 <span style="color:#888; font-weight:normal; font-size:11px;">(자동계산)</span></label>
+                        <input type="number" id="absent" min="0" placeholder="자동" readonly style="background:#f5f5f5; cursor:not-allowed;">
+                    </div>
+                </div>
+                <div>
+                    <label>불참자 명단 및 사유</label>
+                    <input type="text" id="absent_list" placeholder="예: 김○○(병결), 이○○(체험학습) / 없으면 공란">
+                </div>
+            </div>
+
+            <!-- 훈련내용 -->
+            <div class="section">
+                <div class="section-title">🏋️ 훈련내용 <span style="font-weight:normal; color:#888; font-size:12px;">(AI 자동생성)</span></div>
+                <div class="ai-row">
+                    <input type="text" id="training_kw" placeholder="키워드 (예: 기초체력, 턱걸이, 들배지기)">
+                    <button class="btn btn-ai" onclick="generateField('훈련내용', 'training_kw', 'training')">✨ AI 생성</button>
+                </div>
+                <div class="loading" id="training_loading">⏳ AI가 작성 중입니다...</div>
+                <textarea id="training" placeholder="AI가 생성한 내용이 여기에 표시됩니다. 직접 수정도 가능합니다."></textarea>
+            </div>
+
+            <!-- 전달사항 -->
+            <div class="section">
+                <div class="section-title">📢 전달사항 <span style="font-weight:normal; color:#888; font-size:12px;">(AI 자동생성)</span></div>
+                <div class="quick-select">
+                    <label>빠른선택:</label>
+                    <select id="notice_quick" onchange="applyQuickSelect('notice', this.value)">
+                        <option value="">-- 직접 입력 또는 선택 --</option>
+                        <option value="특이사항 없음">특이사항 없음</option>
+                        <option value="- 다음 훈련 일정을 안내함.">- 다음 훈련 일정을 안내함.</option>
+                    </select>
+                </div>
+                <div class="ai-row">
+                    <input type="text" id="notice_kw" placeholder="키워드 (예: 주말 대회, 식단관리)">
+                    <button class="btn btn-ai" onclick="generateField('전달사항', 'notice_kw', 'notice')">✨ AI 생성</button>
+                </div>
+                <div class="loading" id="notice_loading">⏳ AI가 작성 중입니다...</div>
+                <textarea id="notice" placeholder="AI가 생성한 내용이 여기에 표시됩니다."></textarea>
+            </div>
+
+            <!-- 기타사항 -->
+            <div class="section">
+                <div class="section-title">📝 기타사항 <span style="font-weight:normal; color:#888; font-size:12px;">(AI 자동생성)</span></div>
+                <div class="quick-select">
+                    <label>빠른선택:</label>
+                    <select id="etc_quick" onchange="applyQuickSelect('etc', this.value)">
+                        <option value="">-- 직접 입력 또는 선택 --</option>
+                        <option value="특이사항 없음">특이사항 없음</option>
+                        <option value="- 모든 학생 안전하게 훈련을 마침.">- 모든 학생 안전하게 훈련을 마침.</option>
+                    </select>
+                </div>
+                <div class="ai-row">
+                    <input type="text" id="etc_kw" placeholder="키워드 (예: 김○○ 발목 통증)">
+                    <button class="btn btn-ai" onclick="generateField('기타사항', 'etc_kw', 'etc')">✨ AI 생성</button>
+                </div>
+                <div class="loading" id="etc_loading">⏳ AI가 작성 중입니다...</div>
+                <textarea id="etc" placeholder="AI가 생성한 내용이 여기에 표시됩니다."></textarea>
+            </div>
+
+            <button class="btn btn-save" onclick="saveRecord()">💾 저장</button>
+            <button class="btn btn-new" onclick="clearForm()">🆕 새 일지 작성</button>
+        </div>
+
+        <!-- 사이드바 -->
+        <div class="sidebar">
+            <h3>📚 저장된 일지 <span class="count" id="record_count">0</span></h3>
+            <p style="font-size:12px; color:#888; margin: 0 0 10px 0;">💾 저장 버튼을 누르면 자동 추가됩니다.</p>
+            
+            <button class="btn btn-cumulative" onclick="downloadCumulative()">
+                📦 누적 일지 다운로드
+            </button>
+            
+            <button class="btn" onclick="sortByDate()" style="background:#8e44ad; color:white; width:100%; padding:10px; font-size:13px; margin-top:6px;">
+                📅 날짜순으로 정렬
+            </button>
+            <p style="font-size:11px; color:#aaa; margin: 6px 0 10px 0; text-align: center;">
+                드래그로 순서 변경 가능 · 누적 파일에 반영됨
+            </p>
+            
+            <ul class="records-list" id="records_list">
+                <li class="empty-records">아직 저장된 일지가 없습니다.</li>
+            </ul>
+
+            <div class="data-info">
+                <strong>💡 데이터 안전 안내</strong><br>
+                모든 일지는 컴퓨터의 <code>data/</code> 폴더에 영구 저장됩니다.<br>
+                <strong>주기적 백업 권장:</strong> <code>data/</code> 폴더와 누적 한글파일을 USB나 학교 클라우드에 복사하세요.
+            </div>
+        </div>
+    </div>
+
+    <!-- 토스트 알림 -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        let currentEditId = null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            setTodayDate();
+            loadRecords();
+        });
+
+        function setTodayDate() {
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            document.getElementById('date_picker').value = `${yyyy}-${mm}-${dd}`;
+            updateDateFromPicker();
+        }
+
+        function updateDateFromPicker() {
+            const val = document.getElementById('date_picker').value;
+            if (!val) {
+                document.getElementById('date').value = '';
+                document.getElementById('date_display').textContent = '';
+                return;
+            }
+            const [y, m, d] = val.split('-').map(Number);
+            const dateObj = new Date(y, m - 1, d);
+            const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+            const weekday = weekdays[dateObj.getDay()];
+            const formatted = `${y}년 ${m}월 ${d}일 (${weekday})`;
+            document.getElementById('date').value = formatted;
+            document.getElementById('date_display').textContent = '📅 ' + formatted;
+        }
+
+        function autoCalcAbsent() {
+            const total = parseInt(document.getElementById('total').value, 10);
+            const attend = parseInt(document.getElementById('attend').value, 10);
+            const absentInput = document.getElementById('absent');
+            
+            if (isNaN(total) || isNaN(attend)) {
+                absentInput.value = '';
+                return;
+            }
+            if (total < 0 || attend < 0) {
+                absentInput.value = '';
+                return;
+            }
+            // 훈련참가인원이 총인원보다 많으면 0
+            const absent = Math.max(0, total - attend);
+            absentInput.value = absent;
+        }
+
+        function showToast(message, isError) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast show' + (isError ? ' error' : '');
+            setTimeout(() => {
+                toast.className = 'toast';
+            }, 2500);
+        }
+
+        function applyQuickSelect(targetId, value) {
+            if (!value) return;
+            document.getElementById(targetId).value = value;
+        }
+
+        async function generateField(field, keywordId, targetId) {
+            const keywords = document.getElementById(keywordId).value.trim();
+            if (!keywords) {
+                alert('키워드를 먼저 입력해주세요!\n\n💡 키워드 없이 "특이사항 없음"을 입력하려면 위의 빠른선택 드롭다운을 사용하세요.');
+                return;
+            }
+            const loadingEl = document.getElementById(targetId + '_loading');
+            const target = document.getElementById(targetId);
+            loadingEl.style.display = 'block';
+            target.value = '';
+
+            try {
+                const res = await fetch('/generate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({field, keywords})
+                });
+                const data = await res.json();
+                if (data.error) {
+                    alert('오류: ' + data.error);
+                } else {
+                    target.value = data.result;
+                }
+            } catch (e) {
+                alert('서버 통신 오류: ' + e.message);
+            } finally {
+                loadingEl.style.display = 'none';
+            }
+        }
+
+        function gatherFormData() {
+            // 음수가 입력되어도 안전망: 0 미만이면 0으로 보정
+            const sanitizeNumber = (val) => {
+                if (val === '' || val === null) return '';
+                const n = parseInt(val, 10);
+                if (isNaN(n) || n < 0) return '0';
+                return String(n);
+            };
+            return {
+                date: document.getElementById('date').value,
+                place: document.getElementById('place').value,
+                total: sanitizeNumber(document.getElementById('total').value),
+                attend: sanitizeNumber(document.getElementById('attend').value),
+                absent: sanitizeNumber(document.getElementById('absent').value),
+                absent_list: document.getElementById('absent_list').value,
+                training: document.getElementById('training').value,
+                notice: document.getElementById('notice').value,
+                etc: document.getElementById('etc').value,
+                update_id: currentEditId,  // 편집 모드일 때만 ID 포함
+            };
+        }
+
+        async function saveRecord() {
+            const payload = gatherFormData();
+            
+            if (!payload.date) {
+                alert('일시를 입력해주세요!');
+                return;
+            }
+            if (!payload.training) {
+                if (!confirm('훈련내용이 비어있습니다. 그래도 저장하시겠습니까?')) return;
+            }
+
+            try {
+                const res = await fetch('/save', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok || data.error) {
+                    showToast('저장 실패: ' + (data.error || '알 수 없는 오류'), true);
+                    return;
+                }
+                
+                if (currentEditId) {
+                    showToast('✅ 일지 수정 완료! 누적 파일도 갱신되었습니다.');
+                } else {
+                    showToast('✅ 일지 저장 완료! 누적 파일에 자동 추가되었습니다.');
+                }
+                
+                // 저장 후 새 일지 작성 모드로 전환
+                setTimeout(() => {
+                    clearForm();
+                    loadRecords();
+                }, 800);
+            } catch (e) {
+                showToast('저장 오류: ' + e.message, true);
+            }
+        }
+
+        function clearForm() {
+            currentEditId = null;
+            document.getElementById('edit_banner').className = 'edit-mode-banner';
+            
+            setTodayDate();  // date_picker와 date를 오늘로 초기화
+            document.getElementById('place').value = '본교 씨름장';
+            document.getElementById('total').value = '';
+            document.getElementById('attend').value = '';
+            document.getElementById('absent').value = '';
+            document.getElementById('absent_list').value = '';
+            document.getElementById('training_kw').value = '';
+            document.getElementById('training').value = '';
+            document.getElementById('notice_kw').value = '';
+            document.getElementById('notice').value = '';
+            document.getElementById('notice_quick').value = '';
+            document.getElementById('etc_kw').value = '';
+            document.getElementById('etc').value = '';
+            document.getElementById('etc_quick').value = '';
+        }
+
+        async function downloadCumulative() {
+            try {
+                const res = await fetch('/download_cumulative');
+                if (!res.ok) {
+                    const err = await res.json();
+                    showToast(err.error || '누적 파일 다운로드 실패', true);
+                    return;
+                }
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = '씨름부_훈련일지_누적.hwpx';
+                a.click();
+                window.URL.revokeObjectURL(url);
+                showToast('📦 누적 일지 다운로드 완료!');
+            } catch (e) {
+                showToast('다운로드 오류: ' + e.message, true);
+            }
+        }
+
+        async function downloadSingleRecord(id) {
+            try {
+                const res = await fetch('/download_record/' + id);
+                if (!res.ok) {
+                    showToast('다운로드 실패', true);
+                    return;
+                }
+                const blob = await res.blob();
+                const cd = res.headers.get('content-disposition') || '';
+                const fnMatch = cd.match(/filename="?([^"]+)"?/);
+                const filename = fnMatch ? decodeURIComponent(fnMatch[1]) : '훈련일지.hwpx';
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                window.URL.revokeObjectURL(url);
+                showToast('📥 다운로드 완료!');
+            } catch (e) {
+                showToast('다운로드 오류: ' + e.message, true);
+            }
+        }
+
+        async function loadRecords() {
+            try {
+                const res = await fetch('/records');
+                const data = await res.json();
+                renderRecords(data.records || []);
+                document.getElementById('record_count').textContent = data.count || 0;
+            } catch (e) {
+                console.error('기록 로딩 실패:', e);
+            }
+        }
+
+        function renderRecords(records) {
+            const list = document.getElementById('records_list');
+            if (!records || records.length === 0) {
+                list.innerHTML = '<li class="empty-records">아직 저장된 일지가 없습니다.</li>';
+                return;
+            }
+            list.innerHTML = records.map((r, idx) => `
+                <li class="record-item" draggable="true" data-id="${r.id}" data-idx="${idx}">
+                    <div class="record-date">${escapeHtml(r.date || '(날짜없음)')}</div>
+                    <div class="record-place">${escapeHtml(r.place || '')}</div>
+                    <div class="record-actions">
+                        <button onclick="event.stopPropagation(); loadRecord('${r.id}')">📝 편집</button>
+                        <button class="btn-dl" onclick="event.stopPropagation(); downloadSingleRecord('${r.id}')">📥 받기</button>
+                        <button class="btn-delete" onclick="event.stopPropagation(); deleteRecord('${r.id}')">🗑️</button>
+                    </div>
+                </li>
+            `).join('');
+
+            // 드래그 이벤트 등록
+            initDragSort();
+        }
+
+        // === 드래그 정렬 ===
+        let dragSrcEl = null;
+
+        function initDragSort() {
+            const items = document.querySelectorAll('.record-item[draggable]');
+            items.forEach(item => {
+                item.addEventListener('dragstart', handleDragStart);
+                item.addEventListener('dragover', handleDragOver);
+                item.addEventListener('dragenter', handleDragEnter);
+                item.addEventListener('dragleave', handleDragLeave);
+                item.addEventListener('drop', handleDrop);
+                item.addEventListener('dragend', handleDragEnd);
+            });
+        }
+
+        function handleDragStart(e) {
+            dragSrcEl = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', this.dataset.id);
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        function handleDragEnter(e) {
+            this.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            this.classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.classList.remove('drag-over');
+
+            if (dragSrcEl !== this) {
+                const list = document.getElementById('records_list');
+                const allItems = [...list.querySelectorAll('.record-item')];
+                const fromIdx = allItems.indexOf(dragSrcEl);
+                const toIdx = allItems.indexOf(this);
+
+                if (fromIdx < toIdx) {
+                    this.parentNode.insertBefore(dragSrcEl, this.nextSibling);
+                } else {
+                    this.parentNode.insertBefore(dragSrcEl, this);
+                }
+
+                // 새 순서를 서버에 저장
+                saveNewOrder();
+            }
+        }
+
+        function handleDragEnd(e) {
+            document.querySelectorAll('.record-item').forEach(item => {
+                item.classList.remove('dragging', 'drag-over');
+            });
+        }
+
+        async function saveNewOrder() {
+            const items = document.querySelectorAll('.record-item[data-id]');
+            const order = [...items].map(item => item.dataset.id);
+
+            try {
+                const res = await fetch('/records/reorder', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({order})
+                });
+                if (res.ok) {
+                    showToast('✅ 순서 변경 완료! 누적 파일에 반영됨');
+                }
+            } catch (e) {
+                showToast('순서 저장 오류: ' + e.message, true);
+            }
+        }
+
+        // === 날짜순 정렬 ===
+        async function sortByDate() {
+            try {
+                const res = await fetch('/records/sort_by_date', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                if (res.ok) {
+                    showToast('📅 날짜순으로 정렬 완료!');
+                    loadRecords();
+                } else {
+                    showToast('정렬 실패', true);
+                }
+            } catch (e) {
+                showToast('정렬 오류: ' + e.message, true);
+            }
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        async function loadRecord(id) {
+            try {
+                const res = await fetch('/records/' + id);
+                if (!res.ok) {
+                    showToast('기록을 불러올 수 없습니다.', true);
+                    return;
+                }
+                const r = await res.json();
+                currentEditId = id;
+                document.getElementById('edit_banner').className = 'edit-mode-banner show';
+                
+                // 날짜 처리: "2026년 5월 13일 (수)" → date_picker용 "2026-05-13"
+                if (r.date) {
+                    document.getElementById('date').value = r.date;
+                    document.getElementById('date_display').textContent = '📅 ' + r.date;
+                    // 정규식으로 yyyy/mm/dd 추출
+                    const dateMatch = r.date.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/);
+                    if (dateMatch) {
+                        const [, y, m, d] = dateMatch;
+                        document.getElementById('date_picker').value = 
+                            `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                    }
+                }
+                document.getElementById('place').value = r.place || '';
+                document.getElementById('total').value = r.total || '';
+                document.getElementById('attend').value = r.attend || '';
+                document.getElementById('absent').value = r.absent || '';
+                document.getElementById('absent_list').value = r.absent_list || '';
+                document.getElementById('training').value = r.training || '';
+                document.getElementById('notice').value = r.notice || '';
+                document.getElementById('etc').value = r.etc || '';
+                window.scrollTo({top: 0, behavior: 'smooth'});
+            } catch (e) {
+                showToast('불러오기 오류: ' + e.message, true);
+            }
+        }
+
+        async function deleteRecord(id) {
+            if (!confirm('이 일지를 삭제하시겠습니까?\n(누적 파일에서도 제거됩니다.)')) return;
+            try {
+                const res = await fetch('/records/' + id, {method: 'DELETE'});
+                if (res.ok) {
+                    showToast('🗑️ 삭제 완료');
+                    loadRecords();
+                    // 편집 중이던 기록이 삭제되면 폼 초기화
+                    if (currentEditId === id) clearForm();
+                }
+            } catch (e) {
+                showToast('삭제 오류: ' + e.message, true);
+            }
+        }
+    </script>
+</body>
+</html>
