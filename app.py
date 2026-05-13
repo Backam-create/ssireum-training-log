@@ -13,8 +13,8 @@ import zipfile
 import io
 import os
 import re
-import psycopg2
-import psycopg2.extras
+import pg8000.native
+from urllib.parse import urlparse
 from datetime import datetime
 
 load_dotenv()
@@ -34,11 +34,19 @@ CUMULATIVE_HWPX = '씨름부_훈련일지_누적.hwpx'
 
 
 # ==========================================
-# DB 연결 및 기록 관리
+# DB 연결 및 기록 관리 (pg8000 사용)
 # ==========================================
 def get_db():
-    """DB 연결 반환"""
-    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+    """DATABASE_URL을 파싱해서 pg8000 연결 반환"""
+    p = urlparse(DATABASE_URL)
+    conn = pg8000.native.Connection(
+        host=p.hostname,
+        port=p.port or 5432,
+        database=p.path.lstrip('/'),
+        user=p.username,
+        password=p.password,
+        ssl_context=True,  # SSL 필수 (Supabase 요구)
+    )
     return conn
 
 
@@ -46,46 +54,43 @@ def load_records():
     """DB에서 모든 기록 불러오기 (sort_order 순서대로)"""
     try:
         conn = get_db()
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("SELECT * FROM records ORDER BY sort_order ASC, created_at ASC")
-        rows = cur.fetchall()
-        cur.close()
+        rows = conn.run(
+            "SELECT id, date, place, total, attend, absent, absent_list, "
+            "training, notice, etc, created_at, sort_order "
+            "FROM records ORDER BY sort_order ASC, created_at ASC"
+        )
+        columns = ['id', 'date', 'place', 'total', 'attend', 'absent',
+                   'absent_list', 'training', 'notice', 'etc', 'created_at', 'sort_order']
         conn.close()
-        return [dict(r) for r in rows]
+        return [dict(zip(columns, row)) for row in rows]
     except Exception as e:
         print(f"⚠️ DB 읽기 실패: {e}")
         return []
 
 
 def save_record(record):
-    """기록 저장 (INSERT 또는 UPDATE)"""
+    """기록 신규 저장"""
     try:
         conn = get_db()
-        cur = conn.cursor()
-        # 현재 최대 sort_order 조회
-        cur.execute("SELECT COALESCE(MAX(sort_order), -1) FROM records")
-        max_order = cur.fetchone()[0]
-
-        cur.execute("""
-            INSERT INTO records
-                (id, date, place, total, attend, absent, absent_list,
-                 training, notice, etc, created_at, sort_order)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            ON CONFLICT (id) DO UPDATE SET
-                date=EXCLUDED.date, place=EXCLUDED.place,
-                total=EXCLUDED.total, attend=EXCLUDED.attend,
-                absent=EXCLUDED.absent, absent_list=EXCLUDED.absent_list,
-                training=EXCLUDED.training, notice=EXCLUDED.notice,
-                etc=EXCLUDED.etc
-        """, (
-            record['id'], record['date'], record['place'],
-            record['total'], record['attend'], record['absent'],
-            record['absent_list'], record['training'],
-            record['notice'], record['etc'],
-            record['created_at'], max_order + 1
-        ))
-        conn.commit()
-        cur.close()
+        result = conn.run("SELECT COALESCE(MAX(sort_order), -1) FROM records")
+        max_order = result[0][0]
+        conn.run(
+            "INSERT INTO records "
+            "(id, date, place, total, attend, absent, absent_list, "
+            "training, notice, etc, created_at, sort_order) "
+            "VALUES (:id, :date, :place, :total, :attend, :absent, :absent_list, "
+            ":training, :notice, :etc, :created_at, :sort_order) "
+            "ON CONFLICT (id) DO UPDATE SET "
+            "date=EXCLUDED.date, place=EXCLUDED.place, total=EXCLUDED.total, "
+            "attend=EXCLUDED.attend, absent=EXCLUDED.absent, "
+            "absent_list=EXCLUDED.absent_list, training=EXCLUDED.training, "
+            "notice=EXCLUDED.notice, etc=EXCLUDED.etc",
+            id=record['id'], date=record['date'], place=record['place'],
+            total=record['total'], attend=record['attend'], absent=record['absent'],
+            absent_list=record['absent_list'], training=record['training'],
+            notice=record['notice'], etc=record['etc'],
+            created_at=record['created_at'], sort_order=max_order + 1
+        )
         conn.close()
         return True
     except Exception as e:
@@ -97,20 +102,15 @@ def update_record(record_id, record):
     """기존 기록 수정 (sort_order 유지)"""
     try:
         conn = get_db()
-        cur = conn.cursor()
-        cur.execute("""
-            UPDATE records SET
-                date=%s, place=%s, total=%s, attend=%s, absent=%s,
-                absent_list=%s, training=%s, notice=%s, etc=%s
-            WHERE id=%s
-        """, (
-            record['date'], record['place'], record['total'],
-            record['attend'], record['absent'], record['absent_list'],
-            record['training'], record['notice'], record['etc'],
-            record_id
-        ))
-        conn.commit()
-        cur.close()
+        conn.run(
+            "UPDATE records SET date=:date, place=:place, total=:total, "
+            "attend=:attend, absent=:absent, absent_list=:absent_list, "
+            "training=:training, notice=:notice, etc=:etc WHERE id=:id",
+            date=record['date'], place=record['place'], total=record['total'],
+            attend=record['attend'], absent=record['absent'],
+            absent_list=record['absent_list'], training=record['training'],
+            notice=record['notice'], etc=record['etc'], id=record_id
+        )
         conn.close()
         return True
     except Exception as e:
@@ -122,10 +122,7 @@ def delete_record_db(record_id):
     """기록 삭제"""
     try:
         conn = get_db()
-        cur = conn.cursor()
-        cur.execute("DELETE FROM records WHERE id=%s", (record_id,))
-        conn.commit()
-        cur.close()
+        conn.run("DELETE FROM records WHERE id=:id", id=record_id)
         conn.close()
         return True
     except Exception as e:
@@ -137,14 +134,11 @@ def reorder_records_db(new_order):
     """순서 변경 (id 배열 순서대로 sort_order 재할당)"""
     try:
         conn = get_db()
-        cur = conn.cursor()
         for idx, record_id in enumerate(new_order):
-            cur.execute(
-                "UPDATE records SET sort_order=%s WHERE id=%s",
-                (idx, record_id)
+            conn.run(
+                "UPDATE records SET sort_order=:order WHERE id=:id",
+                order=idx, id=record_id
             )
-        conn.commit()
-        cur.close()
         conn.close()
         return True
     except Exception as e:
